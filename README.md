@@ -1247,3 +1247,97 @@ That is the top-level driver for:
 - saving outputs.
 
 Everything else supports it.
+
+
+---
+
+# Stabilized paper baseline
+
+A tuned baseline preset is available for current paper-style studies:
+
+- `"paper_pairwise_chain_baseline"`
+
+This preset was added after a diagnostic tuning sequence on the realistic **NLL + shot-noise** regime.
+
+## Baseline geometry
+
+The current stabilized baseline uses:
+
+- 4 sites
+- 1 qubit per site
+- pairwise chain regions:
+  - `(0,1)`
+  - `(1,2)`
+  - `(2,3)`
+
+This is the first geometry that was taken through a full debugging and stabilization workflow.
+
+## Baseline measurement / truth setup
+
+The preset uses:
+
+- `povm_type = "random_ic"`
+- `povm_num_outcomes = 16`
+- `true_state_model = "random_mixed"`
+- `init_state_method = "maximally_mixed"`
+- `true_confusion_model = "noisy_identity"`
+- `init_confusion_method = "identity"`
+- `confusion_strength = 0.05`
+- `loss_name = "nll"`
+- `seed = 12347`
+- shot noise enabled
+
+## Stabilized solver settings
+
+The following solver settings are currently the recommended baseline for this geometry:
+
+- `beta = 4.0`
+- `gamma_rho = 1.0`
+- `gamma_c = 40.0`
+- `lambda_confusion = 0.5`
+- `outer_max_iters = 8`
+- `inner_max_iters = 60`
+- `state_gd_max_iters = 60`
+- `confusion_gd_max_iters = 400`
+- `confusion_step_size = 0.03`
+- `confusion_gd_tol = 1e-6`
+
+These settings were selected because they gave substantially better behavior in the realistic regime:
+
+- cleaner monotone objective decrease,
+- much smaller overlap residuals,
+- much smaller state primal residuals,
+- lower confusion error,
+- reduced confusion projected-gradient workload relative to earlier tuned variants.
+
+## Why this baseline exists
+
+The purpose of this preset is to provide a **frozen, reproducible starting point** for current study generation.
+
+It is meant to answer:
+
+- state recovery vs shots,
+- confusion recovery vs true readout-noise strength,
+- recovery vs confusion regularization,
+- solver-behavior summaries for the baseline geometry.
+
+It is **not** claimed to be universally optimal for all geometries.
+
+---
+
+# Updated available named experiments
+
+Current named presets now include:
+
+- `"default"`
+- `"fast_debug"`
+- `"pairwise_chain_small"`
+- `"sliding_window_small"`
+- `"single_qubit_local"`
+- `"paper_pairwise_chain_baseline"`
+
+You can verify this with:
+
+```python
+import experiments
+experiments.list_available_experiments()
