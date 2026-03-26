@@ -258,6 +258,70 @@ def make_fast_debug_experiment() -> ExperimentConfig:
     return cfg
 
 
+def make_paper_pairwise_chain_baseline() -> ExperimentConfig:
+    """
+    Stabilized baseline used for current paper-style experiments.
+
+    Geometry
+    --------
+    - 4 sites
+    - 1 qubit per site
+    - pairwise chain regions: (0,1), (1,2), (2,3)
+
+    Measurement / truth
+    -------------------
+    - random informationally complete regional POVMs with 16 outcomes
+    - random mixed true regional states
+    - noisy-identity true confusion matrices
+    - identity initialization for confusion matrices
+    - shot noise enabled
+    - NLL loss
+
+    Tuned solver settings
+    ---------------------
+    These settings were selected after the diagnostic Plan A-E runs in the
+    realistic NLL + shot-noise regime. They are the current recommended
+    baseline for study generation on this geometry.
+    """
+    cfg = make_pairwise_chain_experiment(
+        num_sites=4,
+        qubits_per_site=(1, 1, 1, 1),
+        shots=1500,
+        povm_type="random_ic",
+        povm_num_outcomes=16,
+        true_state_model="random_mixed",
+        init_state_method="maximally_mixed",
+        true_confusion_model="noisy_identity",
+        init_confusion_method="identity",
+        confusion_strength=0.05,
+        loss_name="nll",
+        seed=12347,
+        experiment_name="paper_pairwise_chain_baseline",
+    )
+
+    cfg.simulation.use_shot_noise = True
+
+    # Stabilized baseline solver settings from the tuning sequence
+    cfg.admm.beta = 4.0
+    cfg.admm.gamma_rho = 1.0
+    cfg.admm.gamma_c = 40.0
+    cfg.admm.lambda_confusion = 0.5
+
+    cfg.admm.outer_max_iters = 8
+    cfg.admm.inner_max_iters = 60
+
+    cfg.admm.state_gd_max_iters = 60
+    cfg.admm.confusion_gd_max_iters = 400
+
+    cfg.admm.confusion_step_size = 0.03
+    cfg.admm.confusion_gd_tol = 1e-6
+
+    cfg.admm.verbose = False
+    cfg.admm.print_every = 1
+
+    return cfg
+
+
 def make_named_experiment(name: str) -> ExperimentConfig:
     """
     Build one of the named preset experiments.
@@ -269,6 +333,7 @@ def make_named_experiment(name: str) -> ExperimentConfig:
     - "pairwise_chain_small"
     - "sliding_window_small"
     - "single_qubit_local"
+    - "paper_pairwise_chain_baseline"
     """
     name = _ensure_nonempty_string(name, "name").lower()
 
@@ -328,12 +393,16 @@ def make_named_experiment(name: str) -> ExperimentConfig:
             experiment_name="single_qubit_local",
         )
 
+    if name == "paper_pairwise_chain_baseline":
+        return make_paper_pairwise_chain_baseline()
+
     supported = (
         "default",
         "fast_debug",
         "pairwise_chain_small",
         "sliding_window_small",
         "single_qubit_local",
+        "paper_pairwise_chain_baseline",
     )
     raise ValueError(f"Unknown experiment name '{name}'. Supported names: {supported}.")
 
@@ -348,6 +417,7 @@ def list_available_experiments() -> Tuple[str, ...]:
         "pairwise_chain_small",
         "sliding_window_small",
         "single_qubit_local",
+        "paper_pairwise_chain_baseline",
     )
 
 
@@ -557,6 +627,26 @@ def _self_test_named_builder() -> None:
     assert cfg.num_regions >= 1
 
 
+def _self_test_paper_baseline_builder() -> None:
+    cfg = make_named_experiment("paper_pairwise_chain_baseline")
+    graph = RegionGraph(cfg)
+
+    assert cfg.experiment_name == "paper_pairwise_chain_baseline"
+    assert cfg.num_sites == 4
+    assert cfg.num_regions == 3
+    assert graph.overlap_pairs == ((0, 1), (1, 2))
+    assert cfg.loss.name == "nll"
+    assert cfg.simulation.use_shot_noise is True
+    assert cfg.admm.beta == 4.0
+    assert cfg.admm.gamma_c == 40.0
+    assert cfg.admm.lambda_confusion == 0.5
+    assert cfg.admm.outer_max_iters == 8
+    assert cfg.admm.inner_max_iters == 60
+    assert cfg.admm.confusion_step_size == 0.03
+    assert cfg.admm.confusion_gd_max_iters == 400
+    assert cfg.admm.confusion_gd_tol == 1e-6
+
+
 def _self_test_end_to_end_run() -> None:
     cfg = make_fast_debug_experiment()
     result = run_configured_experiment(cfg, truth_mode="global_consistent", verbose=False)
@@ -575,6 +665,7 @@ def run_self_tests(verbose: bool = True) -> None:
         ("pairwise builder", _self_test_pairwise_builder),
         ("sliding-window builder", _self_test_sliding_builder),
         ("named preset builder", _self_test_named_builder),
+        ("paper baseline builder", _self_test_paper_baseline_builder),
         ("end-to-end experiment run", _self_test_end_to_end_run),
     ]
     for name, fn in tests:
